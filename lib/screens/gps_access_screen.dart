@@ -41,7 +41,10 @@ class _AccessButton extends StatelessWidget {
           elevation: 0,
           shape: const StadiumBorder(),
           onPressed: () {
-            //TODO
+            //pedir los permisos
+            //tener acceso al state
+            final gpsBloc = BlocProvider.of<GpsBloc>(context);
+            gpsBloc.askGpsAccess();
           },
         )
       ],

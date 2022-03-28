@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 part 'gps_event.dart';
 part 'gps_state.dart';
@@ -27,14 +28,21 @@ class GpsBloc extends Bloc<GpsEvent, GpsState> {
 
   //
   Future<void> _init() async {
-    final isEnabled = await _checkGpsStatus();
-    print('isEnabled $isEnabled');
+//llamado por separado de las features
+    // final isEnabled = await _checkGpsStatus();
+    // final isGranted = await _isPermissionGranted();
+//    print('isEnabled $isEnabled, isGranted: $isGranted');
+
+    //disparar diferentes features en paralelo
+    //retorna un arreglo de booleanos en este caso
+    final gpsInitalStatus =
+        await Future.wait([_checkGpsStatus(), _isPermissionGranted()]);
 
     //dispara evento del bloque
 
     add(GpsAndPermissionEvent(
-        isGpsEnabled: isEnabled,
-        isGpsPermissionGranted: state.isGpsPermissionGranted));
+        isGpsEnabled: gpsInitalStatus[0],
+        isGpsPermissionGranted: gpsInitalStatus[1]));
   }
 
   // logica para obtener la info de geolocator
@@ -55,8 +63,32 @@ class GpsBloc extends Bloc<GpsEvent, GpsState> {
     return isEnable;
   }
 
-  //es buena practica cerrar el listener
+  //no mostrar el modal de privilegios si ya se otorgaron
+  Future<bool> _isPermissionGranted() async {
+    final isGranted = await Permission.location.isGranted;
+    return isGranted;
+  }
 
+//pedir el acceso al gps, mediante la panatalla de privilegios en el dispositivo
+  Future<void> askGpsAccess() async {
+    final status = await Permission.location.request();
+    // para pedir permisos de utilizar la localizacion
+    switch (status) {
+      case PermissionStatus.granted:
+        add(GpsAndPermissionEvent(
+            isGpsEnabled: state.isGpsEnabled, isGpsPermissionGranted: true));
+        break;
+      case PermissionStatus.denied:
+      case PermissionStatus.restricted:
+      case PermissionStatus.limited:
+      case PermissionStatus.permanentlyDenied:
+        add(GpsAndPermissionEvent(
+            isGpsEnabled: state.isGpsEnabled, isGpsPermissionGranted: true));
+        openAppSettings();
+    }
+  }
+
+  //es buena practica cerrar el listener
   @override
   Future<void> close() {
     // limpiar el listener
